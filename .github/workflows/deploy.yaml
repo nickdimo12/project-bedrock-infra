@@ -2,8 +2,7 @@ name: Deploy to EKS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -13,13 +12,14 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      # 1. Checkout repository
+      # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configure AWS credentials
-      - name: Configure AWS credentials
+      # 2. Configure AWS credentials (via OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::073186739637:role/github-actions-terraform-role
@@ -34,6 +34,7 @@ jobs:
       # 4. Terraform Init
       - name: Terraform Init
         run: |
+          cd infra
           terraform init \
             -backend-config="bucket=my-innovatemart-terraform-state" \
             -backend-config="key=eks/terraform.tfstate" \
@@ -42,29 +43,24 @@ jobs:
 
       # 5. Terraform Plan
       - name: Terraform Plan
-        run: terraform plan -lock=true -out=tfplan
+        run: |
+          cd infra
+          terraform plan -lock=true -out=tfplan
 
-      # 6. Upload Terraform Plan (for debugging)
-      - name: Upload Terraform Plan
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: tfplan
-          retention-days: 5
-
-      # 7. Terraform Apply
+      # 6. Terraform Apply (only on push to main)
       - name: Terraform Apply
-        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-        run: terraform apply -lock=true -auto-approve tfplan
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd infra
+          terraform apply -lock=true -auto-approve tfplan
 
-      # 8. Configure kubectl for EKS
+      # 7. Configure kubectl for EKS
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig --region eu-west-1 --name bedrock-eks
 
-      # 9. Deploy Kubernetes manifests
-      - name: Deploy manifests to EKS
+      # 8. Deploy Kubernetes manifests
+      - name: Deploy Kubernetes manifests
         run: |
           kubectl apply -f k8s/namespace-retail.yaml
           kubectl apply -f k8s/mysql-secret.yaml
@@ -72,4 +68,3 @@ jobs:
           kubectl apply -f k8s/mysql-service.yaml
           kubectl apply -f k8s/ui-deployment.yaml
           kubectl apply -f k8s/ui-service.yaml
-          kubectl apply -f k8s/ui-ingress.yaml
