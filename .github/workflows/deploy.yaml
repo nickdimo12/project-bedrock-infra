@@ -14,58 +14,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
+      # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configure AWS credentials (via OIDC)
+      # 2. Configure AWS credentials via OIDC
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::073186739637:role/github-actions-terraform-role
           aws-region: eu-west-1
 
-      # 3. Setup Terraform
+      # 3. Setup Terraform with caching
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.9.5
+          terraform_version: 1.7.5
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: terraform-${{ runner.os }}-${{ hashFiles('infra/**/*.tf') }}
+          restore-keys: terraform-${{ runner.os }}-
 
       # 4. Terraform Init
       - name: Terraform Init
         run: |
           cd infra
-          terraform init -input=false \
+          terraform init \
             -backend-config="bucket=my-innovatemart-terraform-state" \
             -backend-config="key=eks/terraform.tfstate" \
             -backend-config="region=eu-west-1" \
             -backend-config="dynamodb_table=terraform-lock"
 
-      # ✅ 5. Terraform Validate (new step)
-      - name: Terraform Validate
+      # 5. Check if EKS cluster already exists
+      - name: Check for existing EKS cluster
+        id: eks_check
         run: |
-          cd infra
-          terraform validate
+          if aws eks describe-cluster --name bedrock-eks --region eu-west-1 >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
 
-      # 6. Terraform Plan
+      # 6. Terraform Plan & Apply (only if cluster doesn't exist)
       - name: Terraform Plan
+        if: steps.eks_check.outputs.exists == 'false'
         run: |
           cd infra
-          terraform plan -input=false -lock=false -out=tfplan -var-file=terraform.tfvars
+          terraform plan -lock=true -out=tfplan
 
-      # 7. Terraform Apply (only on main)
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
+        if: steps.eks_check.outputs.exists == 'false'
         run: |
           cd infra
-          terraform apply -input=false -auto-approve tfplan
+          terraform apply -lock=true -auto-approve tfplan
 
-      # 8. Configure kubectl for EKS
+      # 7. Configure kubectl for EKS
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig --region eu-west-1 --name bedrock-eks
 
-      # 9. Deploy Kubernetes manifests
+      # 8. Deploy Kubernetes manifests
       - name: Deploy Kubernetes manifests
         run: |
           kubectl apply -f k8s/namespace-retail.yaml
@@ -74,3 +85,9 @@ jobs:
           kubectl apply -f k8s/mysql-service.yaml
           kubectl apply -f k8s/ui-deployment.yaml
           kubectl apply -f k8s/ui-service.yaml
+
+      # 9. Verify deployment health
+      - name: Verify Pods
+        run: |
+          kubectl get pods -n retail
+          kubectl get svc -n retail
