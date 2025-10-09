@@ -1,82 +1,107 @@
-# 🛠️ Retail Store Sample App on AWS EKS
+# 🏗️ Project Bedrock Infra — EKS Infrastructure & App Deployment
 
-This project provisions a complete Kubernetes-based microservices application on **Amazon EKS**, automated with **Terraform** and deployed using **GitHub Actions CI/CD**.
-
----
-
-## 📑 Table of Contents
-1. [Repository Structure](#repository-structure)
-2. [Architecture Overview](#architecture-overview)
-3. [Deployment Guide](#deployment-guide)
-4. [Access Instructions](#access-instructions)
+This repository automates the provisioning of a complete **Amazon EKS (Elastic Kubernetes Service)** environment and deployment of a retail sample microservices app using **Terraform** and **GitHub Actions**.
 
 ---
 
-## 📂 Repository Structure
+## 🚀 Overview
 
-```plaintext
-.
-├── infra/               # Infrastructure as Code (EKS, VPC, Nodegroups, etc.)
-├── .github/workflows/       # GitHub Actions CI/CD pipelines
-├── k8s-manifests/           # Custom Kubernetes YAMLs (Deployments, Services, Ingress)
-├── README.md                # Deployment & Architecture Guide (this file)
+- **Infrastructure as Code:** Managed using Terraform.
+- **Deployment:** Automated through GitHub Actions CI/CD workflows.
+- **Kubernetes Workloads:** Defined in the `k8s/` folder.
+- **AWS Services Used:**
+  - Amazon EKS
+  - Amazon S3 (Terraform state)
+  - DynamoDB (state locking)
+  - IAM roles for automation (OIDC and GitHub Actions)
+  - Application Load Balancer for ingress traffic
 
+---
 
-🏗️ Architecture Overview
+## 🧩 Folder Structure
 
-Amazon EKS Cluster: Managed Kubernetes control plane.
+| Folder | Description |
+|--------|--------------|
+| `.github/workflows/` | CI/CD automation pipelines for Terraform and Kubernetes deployment. |
+| `infra/` | Terraform code to provision VPC, EKS cluster, and node groups. |
+| `k8s/` | Kubernetes manifests for app deployments and services. |
 
-Node Group: Worker nodes running container workloads.
+---
 
-Networking: VPC with private/public subnets and security groups.
+## ⚙️ Prerequisites
 
-CI/CD:
+- AWS account with permissions for EKS, S3, IAM, and DynamoDB
+- GitHub OIDC role configured (`github-actions-terraform-role`)
+- Terraform `>= 1.5.0`
+- kubectl and AWS CLI installed
+- S3 bucket and DynamoDB table for backend state
 
-terraform-plan.yml → Runs on feature branches (shows infra changes).
+---
 
-terraform-apply.yml → Runs on main branch (applies infra + deploys app).
+## 🪜 Deployment Steps
 
-🚀 Deployment Guide
-1. Clone the Repository
-git clone https://github.com/nickdimo12/retail-store-sample-app.git
-cd retail-store-sample-app
+### 1️⃣ Clone the repository
+```bash
+git clone https://github.com/nickdimo12/project-bedrock-infra.git
+cd project-bedrock-infra
 
-2. Initialize Terraform
-cd terraform
+2️⃣ Initialize Terraform
+cd infra
 terraform init
 terraform plan
 terraform apply
 
-3. Deploy Kubernetes Manifests
-kubectl apply -f k8s-manifests/
-
-4. Access Instructions
-
-The UI service is exposed via a Kubernetes Ingress → AWS ALB (Application Load Balancer).
-
-Find the ALB URL:
-
-kubectl get ingress -n ui
+3️⃣ Configure kubectl
+aws eks update-kubeconfig --region eu-west-1 --name bedrock-eks
 
 
-Open the URL in your browser to access the application.
+4️⃣ Deploy Kubernetes resources
+kubectl apply -f k8s/namespace-retail.yaml
+kubectl apply -f k8s/mysql-secret.yaml
+kubectl apply -f k8s/mysql-deployment.yaml
+kubectl apply -f k8s/mysql-service.yaml
+kubectl apply -f k8s/ui-deployment.yaml
+kubectl apply -f k8s/ui-service.yaml
 
- IAM Developer Credentials
-
-A read-only IAM user has been created for developers.
-
-To configure AWS CLI with their credentials:
-
-aws configure --profile dev-readonly
+🔁 CI/CD Workflows
+Workflow	Description	Trigger
+terraform-plan.yml	Runs terraform plan on pull requests.	PRs to main
+terraform-apply.yml	Applies Terraform and deploys app.	Merge to main
+deploy.yaml	Unified deploy pipeline for EKS + app rollout.	Push or manual trigger
 
 
-Update your ~/.kube/config to include:
 
-aws eks update-kubeconfig --name <cluster-name> --region <your-region> --profile dev-readonly
+🔒 Security & IAM Setup
 
- Notes
+OIDC provider: token.actions.githubusercontent.com
 
-In production:
+IAM role: github-actions-terraform-role
 
-Restrict IAM permissions.
+Attached policies:
 
+AmazonEKSClusterPolicy
+
+AmazonEKSWorkerNodePolicy
+
+AmazonEKS_CNI_Policy
+
+AmazonEC2ContainerRegistryReadOnly
+
+AmazonS3FullAccess
+
+AmazonDynamoDBFullAccess
+
+🌐 Accessing the App
+
+After deployment, find your ALB ingress endpoint:
+
+kubectl get ingress -n retail
+
+
+Open the listed URL in your browser to access the Retail Store UI.
+
+👨‍💻 Maintainer
+
+Nick Dimo
+📧 Email: [elodimoebuka@yahoo.com]
+🌍 AWS EKS + DevOps Infrastructure Automation.
