@@ -1,34 +1,23 @@
-terraform {
-  required_version = ">= 1.5.0"
+resource "aws_eks_cluster" "this" {
+  name     = var.cluster_name
+  role_arn = var.eks_role_arn
+  version  = var.cluster_version
 
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-
-
-  backend "s3" {
-    bucket         = "my-innovatemart-terraform-state"
-    key            = "eks/terraform.tfstate"
-    region         = "eu-west-1"
-    dynamodb_table = "terraform-lock"
+  vpc_config {
+    subnet_ids = var.subnet_ids
   }
 }
 
+resource "aws_eks_node_group" "this" {
+  cluster_name    = aws_eks_cluster.this.name
+  node_group_name = "bedrock-eks"
+  node_role_arn   = var.node_role_arn
 
-provider "aws" {
-  region = "eu-west-1"
-}
+  scaling_config {
+    desired_size = 2
+    max_size     = 3
+    min_size     = 1
+  }
 
-module "eks" {
-  source = "./modules/eks"
-
-  cluster_name    = "bedrock-eks"
-  cluster_version = "1.29"
-  vpc_id          = "vpc-06d9f330c756a127c"
-  subnet_ids      = ["subnet-0d18d4189a1c03bfd", "subnet-0b29e3b56d8e77446"]
-  eks_role_arn    = "arn:aws:iam::073186739637:role/AmazonEKSClusterRole"
-  node_role_arn   = "arn:aws:iam::073186739637:role/AmazonEKSAutoClusterRole"
+  subnet_ids = var.subnet_ids
 }
