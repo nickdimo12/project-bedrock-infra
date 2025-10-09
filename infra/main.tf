@@ -6,19 +6,7 @@ resource "aws_eks_cluster" "this" {
     enabled = true
   }
 
-  kubernetes_networking_config {
-    elastic_load_balancing {
-      enabled = true
-    }
-  }
-
-  storage_config {
-    block_storage {
-      enabled = true
-    }
-  }
-
-  vpc_config {
+   vpc_config {
     subnet_ids = var.subnet_ids
   }
 }
@@ -36,4 +24,5 @@ resource "aws_eks_node_group" "this" {
 
   subnet_ids = var.subnet_ids
 }
+
 
