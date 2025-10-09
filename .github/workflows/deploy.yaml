@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -41,25 +41,31 @@ jobs:
             -backend-config="region=eu-west-1" \
             -backend-config="dynamodb_table=terraform-lock"
 
-      # 5. Terraform Plan
+      # ✅ 5. Terraform Validate (new step)
+      - name: Terraform Validate
+        run: |
+          cd infra
+          terraform validate
+
+      # 6. Terraform Plan
       - name: Terraform Plan
         run: |
           cd infra
           terraform plan -input=false -lock=false -out=tfplan -var-file=terraform.tfvars
 
-      # 6. Terraform Apply (only on push to main)
+      # 7. Terraform Apply (only on main)
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: |
           cd infra
           terraform apply -input=false -auto-approve tfplan
 
-      # 7. Configure kubectl for EKS
+      # 8. Configure kubectl for EKS
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig --region eu-west-1 --name bedrock-eks
 
-      # 8. Deploy Kubernetes manifests
+      # 9. Deploy Kubernetes manifests
       - name: Deploy Kubernetes manifests
         run: |
           kubectl apply -f k8s/namespace-retail.yaml
