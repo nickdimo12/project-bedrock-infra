@@ -29,13 +29,13 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: 1.9.5
 
       # 4. Terraform Init
       - name: Terraform Init
         run: |
           cd infra
-          terraform init \
+          terraform init -input=false \
             -backend-config="bucket=my-innovatemart-terraform-state" \
             -backend-config="key=eks/terraform.tfstate" \
             -backend-config="region=eu-west-1" \
@@ -45,14 +45,14 @@ jobs:
       - name: Terraform Plan
         run: |
           cd infra
-          terraform plan -lock=true -out=tfplan
+          terraform plan -input=false -lock=false -out=tfplan -var-file=terraform.tfvars
 
       # 6. Terraform Apply (only on push to main)
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: |
           cd infra
-          terraform apply -lock=true -auto-approve tfplan
+          terraform apply -input=false -auto-approve tfplan
 
       # 7. Configure kubectl for EKS
       - name: Configure kubectl
